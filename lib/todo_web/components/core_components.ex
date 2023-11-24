@@ -455,6 +455,8 @@ defmodule TodoWeb.CoreComponents do
   attr :rows, :list, required: true
   attr :row_id, :any, default: nil, doc: "the function for generating the row id"
   attr :row_click, :any, default: nil, doc: "the function for handling phx-click on each row"
+  attr :page, :integer, default: 0
+  attr :end_of_table?, :boolean, default: false
 
   attr :row_item, :any,
     default: &Function.identity/1,
@@ -486,6 +488,8 @@ defmodule TodoWeb.CoreComponents do
         <tbody
           id={@id}
           phx-update={match?(%Phoenix.LiveView.LiveStream{}, @rows) && "stream"}
+          phx-viewport-top={assigns[:page] >= 1 && "prev-page"}
+          phx-viewport-bottom={assigns[:page] > 0 && !assigns[:end_of_table?] && "next-page"}
           class="relative divide-y divide-zinc-100 border-t border-zinc-200 text-sm leading-6 text-zinc-700"
         >
           <tr :for={row <- @rows} id={@row_id && @row_id.(row)} class="group hover:bg-zinc-50">
