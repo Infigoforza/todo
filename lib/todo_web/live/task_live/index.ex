@@ -1,14 +1,19 @@
 defmodule TodoWeb.TaskLive.Index do
+  alias TodoWeb.Endpoint
+
   use TodoWeb, :live_view
 
   alias Todo.Overview
   alias Todo.Overview.Task
 
+  @topic "tasks:all"
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, _session, socket) do
+    if connected?(socket), do: Endpoint.subscribe(@topic)
+
     updates_socket =
       socket
-      |> assign(search: "", per_page: 20, page: 1)
+      |> assign(search: params["search"] || "", per_page: 20, page: 1)
       |> paginate_tasks(1)
 
     {:ok, updates_socket}
@@ -39,16 +44,20 @@ defmodule TodoWeb.TaskLive.Index do
 
   @impl true
   def handle_info({TodoWeb.TaskLive.FormComponent, {:saved, task}}, socket) do
+    Endpoint.broadcast(@topic, "new_task", %{task: task})
+    {:noreply, socket}
+  end
+
+  def handle_info(%Phoenix.Socket.Broadcast{topic: @topic, payload: %{task: task}}, socket) do
     {:noreply, stream_insert(socket, :tasks, task)}
   end
 
   def handle_event("search", %{"search" => search}, socket) do
-    updated_socket =
-      socket
-      |> assign(:search, search)
-      |> paginate_tasks(1, true)
-
-    {:noreply, updated_socket}
+    {:noreply,
+     socket
+     |> assign(:search, search)
+     |> paginate_tasks(1, true)
+     |> push_patch(to: ~p"/tasks?#{[search: search]}")}
   end
 
   @impl true
@@ -91,6 +100,7 @@ defmodule TodoWeb.TaskLive.Index do
     case tasks do
       [] ->
         assign(socket, end_of_table?: at == -1)
+        |> stream(:tasks, [], reset: true)
 
       [_ | _] = tasks ->
         socket
